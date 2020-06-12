@@ -174,7 +174,7 @@ module riscv_id_stage
     output logic [1:0]  csr_op_ex_o,
     input  PrivLvl_t    current_priv_lvl_i,
     output logic        csr_irq_sec_o,
-    output logic [6:0]  csr_cause_o,
+    output csr_cause_t  csr_cause_o,
     output logic        csr_save_if_o,
     output logic        csr_save_id_o,
     output logic        csr_save_ex_o,
@@ -214,12 +214,16 @@ module riscv_id_stage
 
     // Interrupt signals
     input  logic        irq_pending_i,
+    input  logic [7:0]  irq_lev_i,
     input  logic        irq_sec_i,
-    input  logic [5:0]  irq_id_i,
+    input  logic [9:0]  irq_id_i,
+    input  logic [7:0]  irq_mil_i, // current machine interrupt level
+    input  logic [7:0]  irq_uil_i, // current user interrupt level
     input  logic        m_irq_enable_i,
     input  logic        u_irq_enable_i,
     output logic        irq_ack_o,
-    output logic [4:0]  irq_id_o,
+    output logic [9:0]  irq_id_o,
+    output logic [7:0]  irq_lev_ctrl_o,
     output logic [5:0]  exc_cause_o,
 
     // Debug Signal
@@ -310,8 +314,10 @@ module riscv_id_stage
 
 
   // Signals running between controller and exception controller
-  logic       irq_req_ctrl, irq_sec_ctrl;
-  logic [5:0] irq_id_ctrl;
+  logic       irq_req_ctrl;
+  logic       irq_sec_ctrl;
+  logic [9:0] irq_id_ctrl;
+
   logic       exc_ack, exc_kill;// handshake
 
   // Register file interface
@@ -1242,6 +1248,7 @@ module riscv_id_stage
     // Interrupt Controller Signals
     .irq_pending_i                  ( irq_pending_i          ),
     .irq_req_ctrl_i                 ( irq_req_ctrl           ),
+    .irq_lev_i                      ( PRIV_LVL_U == current_priv_lvl_i ? irq_uil_i : irq_mil_i ),
     .irq_sec_ctrl_i                 ( irq_sec_ctrl           ),
     .irq_id_ctrl_i                  ( irq_id_ctrl            ),
     .m_IE_i                         ( m_irq_enable_i         ),
@@ -1347,6 +1354,7 @@ module riscv_id_stage
 
     // to controller
     .irq_req_ctrl_o       ( irq_req_ctrl       ),
+    .irq_lev_ctrl_o       ( irq_lev_ctrl_o     ),
     .irq_sec_ctrl_o       ( irq_sec_ctrl       ),
     .irq_id_ctrl_o        ( irq_id_ctrl        ),
 
@@ -1355,8 +1363,12 @@ module riscv_id_stage
 
     // Interrupt signals
     .irq_pending_i        ( irq_pending_i      ),
+    .irq_lev_i            ( irq_lev_i          ),
     .irq_sec_i            ( irq_sec_i          ),
     .irq_id_i             ( irq_id_i           ),
+
+    .irq_mil_i            ( irq_mil_i          ),
+    .irq_uil_i            ( irq_uil_i          ),
 
     .m_IE_i               ( m_irq_enable_i     ),
     .u_IE_i               ( u_irq_enable_i     ),

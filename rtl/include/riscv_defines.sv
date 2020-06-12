@@ -209,60 +209,59 @@ parameter VEC_MODE8  = 2'b11;
 // imported form IBEX, some regs may be still not implemented
 typedef enum logic[11:0] {
   // Machine information
-  CSR_MHARTID   = 12'hF14,
+  CSR_MHARTID    = 12'hF14,
 
   // Machine trap setup
-  CSR_MSTATUS   = 12'h300,
-  CSR_MISA      = 12'h301,
-  CSR_MIE       = 12'h304,
-  CSR_MTVEC     = 12'h305,
-  CSR_MIEX      = 12'h7D0,
-  CSR_MTVECX    = 12'h7D1,
+  CSR_MSTATUS    = 12'h300,
+  CSR_MISA       = 12'h301,
+  CSR_MIE        = 12'h304,
+  CSR_MTVEC      = 12'h305,
 
   // Machine trap handling
-  CSR_MSCRATCH  = 12'h340,
-  CSR_MEPC      = 12'h341,
-  CSR_MCAUSE    = 12'h342,
-  CSR_MIP       = 12'h344,
-  CSR_MIPX      = 12'h7D2,
+  CSR_MSCRATCH   = 12'h340,
+  CSR_MEPC       = 12'h341,
+  CSR_MCAUSE     = 12'h342,
+  CSR_MIP        = 12'h344,
+  CSR_MINTSTATUS = 12'h346,
 
   // User trap setup
-  CSR_USTATUS   = 12'h000,
-  CSR_UTVEC     = 12'h005,
+  CSR_USTATUS    = 12'h000,
+  CSR_UTVEC      = 12'h005,
 
   // User trap handling
-  CSR_UEPC      = 12'h041,
-  CSR_UCAUSE    = 12'h042,
+  CSR_UEPC       = 12'h041,
+  CSR_UCAUSE     = 12'h042,
+  CSR_UINTSTATUS = 12'h046,
 
   // Physical memory protection
-  CSR_PMPCFG0   = 12'h3A0,
-  CSR_PMPCFG1   = 12'h3A1,
-  CSR_PMPCFG2   = 12'h3A2,
-  CSR_PMPCFG3   = 12'h3A3,
-  CSR_PMPADDR0  = 12'h3B0,
-  CSR_PMPADDR1  = 12'h3B1,
-  CSR_PMPADDR2  = 12'h3B2,
-  CSR_PMPADDR3  = 12'h3B3,
-  CSR_PMPADDR4  = 12'h3B4,
-  CSR_PMPADDR5  = 12'h3B5,
-  CSR_PMPADDR6  = 12'h3B6,
-  CSR_PMPADDR7  = 12'h3B7,
-  CSR_PMPADDR8  = 12'h3B8,
-  CSR_PMPADDR9  = 12'h3B9,
-  CSR_PMPADDR10 = 12'h3BA,
-  CSR_PMPADDR11 = 12'h3BB,
-  CSR_PMPADDR12 = 12'h3BC,
-  CSR_PMPADDR13 = 12'h3BD,
-  CSR_PMPADDR14 = 12'h3BE,
-  CSR_PMPADDR15 = 12'h3BF,
+  CSR_PMPCFG0    = 12'h3A0,
+  CSR_PMPCFG1    = 12'h3A1,
+  CSR_PMPCFG2    = 12'h3A2,
+  CSR_PMPCFG3    = 12'h3A3,
+  CSR_PMPADDR0   = 12'h3B0,
+  CSR_PMPADDR1   = 12'h3B1,
+  CSR_PMPADDR2   = 12'h3B2,
+  CSR_PMPADDR3   = 12'h3B3,
+  CSR_PMPADDR4   = 12'h3B4,
+  CSR_PMPADDR5   = 12'h3B5,
+  CSR_PMPADDR6   = 12'h3B6,
+  CSR_PMPADDR7   = 12'h3B7,
+  CSR_PMPADDR8   = 12'h3B8,
+  CSR_PMPADDR9   = 12'h3B9,
+  CSR_PMPADDR10  = 12'h3BA,
+  CSR_PMPADDR11  = 12'h3BB,
+  CSR_PMPADDR12  = 12'h3BC,
+  CSR_PMPADDR13  = 12'h3BD,
+  CSR_PMPADDR14  = 12'h3BE,
+  CSR_PMPADDR15  = 12'h3BF,
 
   // Debug/trace
-  CSR_DCSR      = 12'h7b0,
-  CSR_DPC       = 12'h7b1,
+  CSR_DCSR       = 12'h7b0,
+  CSR_DPC        = 12'h7b1,
 
   // Debug
-  CSR_DSCRATCH0 = 12'h7b2, // optional
-  CSR_DSCRATCH1 = 12'h7b3 // optional
+  CSR_DSCRATCH0  = 12'h7b2, // optional
+  CSR_DSCRATCH1  = 12'h7b3  // optional
 
 } csr_num_e;
 
@@ -277,8 +276,7 @@ parameter int unsigned CSR_MSIX_BIT      = 3;
 parameter int unsigned CSR_MTIX_BIT      = 7;
 parameter int unsigned CSR_MEIX_BIT      = 11;
 parameter int unsigned CSR_MFIX_BIT_LOW  = 16;
-parameter int unsigned CSR_MFIX_BIT_HIGH = 30;
-parameter int unsigned CSR_NMIX_BIT      = 31; // nmi bit needed to read mip
+parameter int unsigned CSR_MFIX_BIT_HIGH = 31;
 
 // SPR for debugger, not accessible by CPU
 parameter SP_DVR0       = 16'h3000;
@@ -433,15 +431,13 @@ typedef struct packed {
   logic        irq_software;
   logic        irq_timer;
   logic        irq_external;
-  logic [14:0] irq_fast;
-  logic        irq_nmi;
+  logic [15:0] irq_fast;
 } Interrupts_t;
 
 
 // Trap mux selector
 parameter TRAP_MACHINE      = 2'b00;
 parameter TRAP_USER         = 2'b01;
-parameter TRAP_MACHINEX     = 2'b10;
 
 // Debug Cause
 parameter DBG_CAUSE_EBREAK     = 3'h1;
@@ -550,5 +546,11 @@ parameter PCMR_MACHINE = 12'h7E1; //NON standard read/write (Machine CSRs)
 
 
 
+typedef struct packed
+{
+    logic        irq;    // 1=interrupt, 0=exception
+    logic [7:0]  pil;    // previous interrupt level
+    logic [11:0] excode; // exception or interrupt code
+} csr_cause_t;
 
 endpackage

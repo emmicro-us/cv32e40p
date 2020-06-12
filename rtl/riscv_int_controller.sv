@@ -33,8 +33,9 @@ module riscv_int_controller
 
   // irq_req for controller
   output logic        irq_req_ctrl_o,
+  output logic  [7:0] irq_lev_ctrl_o,
   output logic        irq_sec_ctrl_o,
-  output logic  [5:0] irq_id_ctrl_o,
+  output logic  [9:0] irq_id_ctrl_o,
 
   // handshake signals to controller
   input  logic        ctrl_ack_i,
@@ -42,8 +43,12 @@ module riscv_int_controller
 
   // external interrupt lines
   input  logic        irq_pending_i,  // level-triggered interrupt inputs
+  input  logic  [7:0] irq_lev_i,
   input  logic        irq_sec_i,      // interrupt secure bit from EU
-  input  logic  [5:0] irq_id_i,       // interrupt id [0,1,....31]
+  input  logic  [9:0] irq_id_i,       // interrupt id [0,1,....31]
+
+  input  logic  [7:0] irq_mil_i,      // current machine interrupt level
+  input  logic  [7:0] irq_uil_i,      // current user interrupt level
 
   input  logic        m_IE_i,         // interrupt enable bit from CSR (M mode)
   input  logic        u_IE_i,         // interrupt enable bit from CSR (U mode)
@@ -54,7 +59,7 @@ module riscv_int_controller
   enum logic [1:0] { IDLE, IRQ_PENDING, IRQ_DONE} exc_ctrl_cs;
 
   logic irq_enable_ext;
-  logic [5:0] irq_id_q;
+  logic [9:0] irq_id_q;
   logic irq_sec_q;
 
 if(PULP_SECURE)
@@ -70,9 +75,10 @@ else
   begin
     if (rst_n == 1'b0) begin
 
-      irq_id_q    <= '0;
-      irq_sec_q   <= 1'b0;
-      exc_ctrl_cs <= IDLE;
+      irq_id_q       <= '0;
+      irq_lev_ctrl_o <= '0;
+      irq_sec_q      <= 1'b0;
+      exc_ctrl_cs    <= IDLE;
 
     end else begin
 
@@ -80,11 +86,35 @@ else
 
         IDLE:
         begin
-          if(irq_enable_ext & irq_pending_i) begin
-            exc_ctrl_cs <= IRQ_PENDING;
-            irq_id_q    <= irq_id_i;
-            irq_sec_q   <= irq_sec_i;
-          end
+          case(current_priv_lvl_i)
+            PRIV_LVL_M: begin
+              if(m_IE_i & irq_pending_i & irq_sec_i & irq_mil_i < irq_lev_i) begin
+                // Machine mode to higher priority machine mode interrupt.
+                exc_ctrl_cs    <= IRQ_PENDING;
+                irq_id_q       <= irq_id_i;
+                irq_lev_ctrl_o <= irq_lev_i;
+                irq_sec_q      <= irq_sec_i;
+              end
+            end // PRIV_LVL_M
+
+            PRIV_LVL_U: begin
+              if(m_IE_i & irq_pending_i & irq_sec_i) begin
+                // User mode to machine mode interrupt.
+                exc_ctrl_cs    <= IRQ_PENDING;
+                irq_id_q       <= irq_id_i;
+                irq_lev_ctrl_o <= irq_lev_i;
+                irq_sec_q      <= irq_sec_i;
+              end if(u_IE_i & irq_pending_i & !irq_sec_i & irq_uil_i < irq_lev_i) begin
+                // User mode to higher priority user mode interrupt.
+                exc_ctrl_cs    <= IRQ_PENDING;
+                irq_id_q       <= irq_id_i;
+                irq_lev_ctrl_o <= irq_lev_i;
+                irq_sec_q      <= irq_sec_i;
+              end
+            end // PRIV_LVL_U
+
+            default: ;
+          endcase // current_priv_lvl_i
         end
 
         IRQ_PENDING:

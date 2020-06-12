@@ -103,15 +103,16 @@ module riscv_controller
 
   // Interrupt Controller Signals
   input  logic        irq_pending_i,
+  input  logic [7:0]  irq_lev_i,
   input  logic        irq_req_ctrl_i,
   input  logic        irq_sec_ctrl_i,
-  input  logic [5:0]  irq_id_ctrl_i,
+  input  logic [9:0]  irq_id_ctrl_i,
   input  logic        m_IE_i,                     // interrupt enable bit from CSR (M mode)
   input  logic        u_IE_i,                     // interrupt enable bit from CSR (U mode)
   input  PrivLvl_t    current_priv_lvl_i,
 
   output logic        irq_ack_o,
-  output logic [4:0]  irq_id_o,
+  output logic [9:0]  irq_id_o,
 
   output logic [5:0]  exc_cause_o,
   output logic        exc_ack_o,
@@ -130,7 +131,7 @@ module riscv_controller
   output logic        csr_save_if_o,
   output logic        csr_save_id_o,
   output logic        csr_save_ex_o,
-  output logic [6:0]  csr_cause_o,
+  output csr_cause_t  csr_cause_o,
   output logic        csr_irq_sec_o,
   output logic        csr_restore_mret_id_o,
   output logic        csr_restore_uret_id_o,
@@ -250,7 +251,11 @@ module riscv_controller
     exc_pc_mux_o           = EXC_PC_IRQ;
     trap_addr_mux_o        = TRAP_MACHINE;
 
-    csr_cause_o            = '0;
+    csr_cause_o            = '{
+                                1'b0,      /* irq */
+                                irq_lev_i, /* pil */
+                                12'b0      /* excode */
+                              };
     csr_irq_sec_o          = 1'b0;
 
     pc_mux_o               = PC_BOOT;
@@ -265,7 +270,7 @@ module riscv_controller
     halt_if_o              = 1'b0;
     halt_id_o              = 1'b0;
     irq_ack_o              = 1'b0;
-    irq_id_o               = irq_id_ctrl_i[4:0];
+    irq_id_o               = irq_id_ctrl_i;
 
     boot_done              = 1'b0;
     jump_in_dec            = jump_in_dec_i == BRANCH_JALR || jump_in_dec_i == BRANCH_JAL;
@@ -407,8 +412,8 @@ module riscv_controller
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
 
-            csr_cause_o       = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
-            ctrl_fsm_ns       = FLUSH_WB;
+            csr_cause_o.excode = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
+            ctrl_fsm_ns        = FLUSH_WB;
 
           end  //data error
 
@@ -425,8 +430,8 @@ module riscv_controller
 
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
 
-            csr_cause_o       = EXC_CAUSE_INSTR_FAULT;
-            ctrl_fsm_ns       = FLUSH_WB;
+            csr_cause_o.excode = EXC_CAUSE_INSTR_FAULT;
+            ctrl_fsm_ns        = FLUSH_WB;
 
 
           end
@@ -597,8 +602,9 @@ module riscv_controller
             csr_save_cause_o  = 1'b1;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
-            csr_cause_o       = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
-            ctrl_fsm_ns       = FLUSH_WB;
+            csr_cause_o.excode = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
+            ctrl_fsm_ns        = FLUSH_WB;
+
             //putting illegal to 0 as if it was 1, the core is going to jump to the exception of the EX stage,
             //so the illegal was never executed
             illegal_insn_n    = 1'b0;
@@ -608,20 +614,20 @@ module riscv_controller
           ctrl_fsm_ns = FLUSH_WB;
 
           if(illegal_insn_q) begin
-            csr_save_id_o     = 1'b1;
-            csr_save_cause_o  = 1'b1;
-            csr_cause_o       = EXC_CAUSE_ILLEGAL_INSN;
+            csr_save_id_o      = 1'b1;
+            csr_save_cause_o   = 1'b1;
+            csr_cause_o.excode = EXC_CAUSE_ILLEGAL_INSN;
           end else begin
             unique case (1'b1)
               ebrk_insn_i: begin
-                csr_save_id_o     = 1'b1;
-                csr_save_cause_o  = 1'b1;
-                csr_cause_o       = EXC_CAUSE_BREAKPOINT;
+                csr_save_id_o      = 1'b1;
+                csr_save_cause_o   = 1'b1;
+                csr_cause_o.excode = EXC_CAUSE_BREAKPOINT;
               end
               ecall_insn_i: begin
-                csr_save_id_o     = 1'b1;
-                csr_save_cause_o  = 1'b1;
-                csr_cause_o       = current_priv_lvl_i == PRIV_LVL_U ? EXC_CAUSE_ECALL_UMODE : EXC_CAUSE_ECALL_MMODE;
+                csr_save_id_o      = 1'b1;
+                csr_save_cause_o   = 1'b1;
+                csr_cause_o.excode = current_priv_lvl_i == PRIV_LVL_U ? EXC_CAUSE_ECALL_UMODE : EXC_CAUSE_ECALL_MMODE;
               end
               default:;
             endcase // unique case (1'b1)
@@ -645,8 +651,8 @@ module riscv_controller
             csr_save_cause_o  = 1'b1;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
-            csr_cause_o       = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
-            ctrl_fsm_ns       = FLUSH_WB;
+            csr_cause_o.excode = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
+            ctrl_fsm_ns        = FLUSH_WB;
 
         end  //data error
         else begin
@@ -709,27 +715,19 @@ module riscv_controller
         pc_set_o          = 1'b1;
         pc_mux_o          = PC_EXCEPTION;
         exc_pc_mux_o      = EXC_PC_IRQ;
-        exc_cause_o       = {1'b0,irq_id_ctrl_i[4:0]};
+        exc_cause_o       = {5'd0,irq_id_ctrl_i[4:0]};
         csr_irq_sec_o     = irq_sec_ctrl_i;
 
-        // if irq_id > 31 serve a fastx irq
-        if (irq_id_ctrl_i[5]) begin
-          irq_ack_o         = 1'b1;
-          if(irq_sec_ctrl_i)
-            trap_addr_mux_o  = TRAP_MACHINEX;
-          else
-            trap_addr_mux_o  = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINEX;
-        // else serve a std irq
-        end else begin
-          if(irq_sec_ctrl_i)
-            trap_addr_mux_o  = TRAP_MACHINE;
-          else
-            trap_addr_mux_o  = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINE;
-        end
+        if(irq_sec_ctrl_i)
+          trap_addr_mux_o = TRAP_MACHINE;
+        else
+          trap_addr_mux_o = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINE;
 
         csr_save_cause_o  = 1'b1;
-        csr_cause_o       = {1'b1,irq_id_ctrl_i};
+        csr_cause_o.irq   = 1'b1;
+        csr_cause_o.excode = irq_id_ctrl_i;
         csr_save_id_o     = 1'b1;
+        irq_ack_o         = 1'b1;
         exc_ack_o         = 1'b1;
         ctrl_fsm_ns       = DECODE;
       end
@@ -742,27 +740,19 @@ module riscv_controller
         pc_set_o          = 1'b1;
         pc_mux_o          = PC_EXCEPTION;
         exc_pc_mux_o      = EXC_PC_IRQ;
-        exc_cause_o       = {1'b0,irq_id_ctrl_i[4:0]};
+        exc_cause_o       = {5'd0,irq_id_ctrl_i[4:0]};
         csr_irq_sec_o     = irq_sec_ctrl_i;
 
-        // if irq_id > 31 serve a fastx irq
-        if (irq_id_ctrl_i[5]) begin
-          irq_ack_o         = 1'b1;
-          if(irq_sec_ctrl_i)
-            trap_addr_mux_o  = TRAP_MACHINEX;
-          else
-            trap_addr_mux_o  = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINEX;
-        // else serve a std irq
-        end else begin
-          if(irq_sec_ctrl_i)
-            trap_addr_mux_o  = TRAP_MACHINE;
-          else
-            trap_addr_mux_o  = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINE;
-        end
+        if(irq_sec_ctrl_i)
+          trap_addr_mux_o = TRAP_MACHINE;
+        else
+          trap_addr_mux_o = current_priv_lvl_i == PRIV_LVL_U ? TRAP_USER : TRAP_MACHINE;
 
         csr_save_cause_o  = 1'b1;
-        csr_cause_o       = {1'b1,irq_id_ctrl_i};
+        csr_cause_o.irq   = 1'b1;
+        csr_cause_o.excode = irq_id_ctrl_i;
         csr_save_if_o     = 1'b1;
+        irq_ack_o         = 1'b1;
         exc_ack_o         = 1'b1;
         ctrl_fsm_ns       = DECODE;
       end
@@ -973,8 +963,8 @@ module riscv_controller
             csr_save_cause_o  = 1'b1;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
-            csr_cause_o       = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
-            ctrl_fsm_ns       = FLUSH_WB;
+            csr_cause_o.excode = data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT;
+            ctrl_fsm_ns        = FLUSH_WB;
 
         end  //data error
         else begin
