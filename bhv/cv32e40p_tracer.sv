@@ -674,10 +674,10 @@ module cv32e40p_tracer import cv32e40p_pkg::*;
 
           6'b010101: begin
             unique case (instr[14:13])
-               2'b00: mnemonic = instr[25] ? "pv.clpxmul.r"      : "pv.clpxmul.i";
-               2'b01: mnemonic = instr[25] ? "pv.clpxmul.r.div2" : "pv.clpxmul.i.div2";
-               2'b10: mnemonic = instr[25] ? "pv.clpxmul.r.div4" : "pv.clpxmul.i.div4";
-               2'b11: mnemonic = instr[25] ? "pv.clpxmul.r.div8" : "pv.clpxmul.i.div8";
+               2'b00: mnemonic = instr[25] ? "pv.clpxmul.i"      : "pv.clpxmul.r";
+               2'b01: mnemonic = instr[25] ? "pv.clpxmul.i.div2" : "pv.clpxmul.r.div2";
+               2'b10: mnemonic = instr[25] ? "pv.clpxmul.i.div4" : "pv.clpxmul.r.div4";
+               2'b11: mnemonic = instr[25] ? "pv.clpxmul.i.div8" : "pv.clpxmul.r.div8";
             endcase
             str_sci = "";
           end
